@@ -1,0 +1,52 @@
+{
+  "name": "astro-fatsoma",
+  "version": "1.0.0",
+  "description": "An Astro integration that fetches live event data from the Fatsoma API and keeps event listings automatically up to date.",
+  "homepage": "https://velohost.co.uk/plugins/astro-fatsoma/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/velohost/astro-fatsoma.git"
+  },
+  "bugs": {
+    "url": "https://github.com/velohost/astro-fatsoma/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "keywords": [
+    "withastro",
+    "astro-integration",
+    "fatsoma",
+    "events",
+    "ticketing"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./fatsoma": {
+      "types": "./dist/runtime/module.d.ts",
+      "default": "./dist/runtime/module.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "fatsoma": [
+        "dist/runtime/module.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "peerDependencies": {
+    "astro": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.3",
+    "typescript": "^5.0.0"
+  }
+}

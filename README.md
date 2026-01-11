@@ -1,225 +1,155 @@
-# astro-build-id
+# astro-fatsoma
 
-**Deterministic build identification for Astro sites**
+A minimal, **SSR-first Astro integration** for fetching and normalising public event data from the **Fatsoma API**.
 
-`astro-build-id` is a tiny, static-first Astro integration that writes a single
-build identifier file at build time.
+Designed to be **clean, stable, and boring by default** — no tracking, no client-side fetches, no UI opinions.
 
-It exists to answer one simple operational question:
-
-> *Which build is currently deployed?*
-
-No databases.  
-No runtime code.  
-No guessing.
+Official plugin page:  
+https://velohost.co.uk/plugins/astro-plugins/astro-fatsoma/
 
 ---
 
-## Why this exists
+## Features
 
-With static sites and CDNs, it is often hard to tell:
-
-- whether a deploy actually updated
-- if a cache purge worked
-- which environment is live
-- whether two environments are running the same build
-
-People end up:
-- redeploying “just in case”
-- adding random comments to HTML
-- guessing from timestamps
-
-`astro-build-id` solves this cleanly with **one file**.
+- ✅ Server-side (SSR) only
+- ✅ Deterministic, stable event shape (v1)
+- ✅ In-memory cache with stale-while-revalidate
+- ✅ Zero client-side JavaScript
+- ✅ No analytics, tracking, or cookies
+- ✅ Designed for Astro sites and static generation
 
 ---
 
-## What it does (v1)
+## What this plugin does
 
-On `astro build`, the plugin writes a file (by default):
-
-```
-/build-id.txt
-```
-
-Containing a **single immutable value**, for example:
-
-```
-2026-01-08T19:42:11.341Z
-```
-
-This file is:
-
-- Static
-- Cache-safe
-- Public-safe
-- Deterministic per build
-- Easy to inspect with `curl`
+- Fetches **public events** from the Fatsoma API
+- Normalises the response into a **clean v1 interface**
+- Caches results in memory (10 minutes by default)
+- Fails safely — never breaks SSR
 
 ---
 
-## What it does NOT do
+## What this plugin does NOT do
 
-This plugin deliberately does **not**:
-
-- Run at runtime
-- Use databases
-- Read git state
-- Guess CI providers
-- Inject HTML
-- Depend on adapters
-- Expose secrets
-
-It reflects **build identity only**, nothing else.
+- ❌ No UI components
+- ❌ No client-side fetching
+- ❌ No auth or private endpoints
+- ❌ No mutation (read-only)
+- ❌ No opinionated formatting
 
 ---
 
 ## Installation
 
 ```bash
-npm install astro-build-id
+npm install astro-fatsoma
 ```
 
 ---
 
-## Basic usage
+## Astro configuration
 
-Add the integration to your `astro.config.mjs`:
+Add the plugin to your `astro.config.mjs` and provide a Fatsoma **page ID**.
 
 ```js
 import { defineConfig } from "astro/config";
-import astroBuildId from "astro-build-id";
+import fatsoma from "astro-fatsoma";
 
 export default defineConfig({
   integrations: [
-    astroBuildId()
-  ]
+    fatsoma({
+      pageId: "YOUR_FATSOMA_PAGE_ID",
+    }),
+  ],
 });
 ```
 
-After build:
+---
 
-```
-dist/build-id.txt
+## Usage
+
+```astro
+---
+import { getFatsomaEvents } from "astro-fatsoma/fatsoma";
+
+const events = await getFatsomaEvents();
+---
+
+<ul>
+  {events.map(event => (
+    <li>
+      <a href={event.url}>{event.name}</a>
+    </li>
+  ))}
+</ul>
 ```
 
 ---
 
-## Build ID formats
+## Public Event Shape (v1)
 
-By default, the build ID is an ISO timestamp.
+```ts
+export interface FatsomaEvent {
+  id: string;
 
-You can change the format:
+  name: string;
+  vanity: string;
+  seoName: string | null;
+  url: string;
 
-```js
-astroBuildId({
-  format: "unix"
-})
-```
+  startsAt: string;
+  endsAt: string;
+  lastEntryTime: string | null;
 
-Supported formats:
+  currency: string;
+  price: {
+    min: number | null;
+    max: number | null;
+  };
 
-| Format | Example |
-|------|--------|
-| `iso` (default) | `2026-01-08T19:42:11.341Z` |
-| `unix` | `1736365331` |
-| `short` | `k0x9f2ab` |
+  image: string | null;
+  descriptionHtml: string | null;
 
----
-
-## Custom filename
-
-```js
-astroBuildId({
-  filename: "health.txt"
-})
-```
-
-Result:
-
-```
-/health.txt
+  ageRestriction: string | null;
+  attendeesCount: number | null;
+}
 ```
 
 ---
 
-## CI / CD integration (recommended)
+## Caching behaviour
 
-The most common and powerful usage is to pass a value from CI.
+- In-memory cache (per server instance)
+- TTL: **10 minutes**
+- Uses **stale-while-revalidate**
+- Automatically falls back to stale cache or empty array on failure
 
-### Example (GitHub Actions)
-
-```yaml
-- name: Build
-  run: |
-    echo "BUILD_ID=${GITHUB_RUN_ID}" >> $GITHUB_ENV
-    npm run build
-```
-
-```js
-astroBuildId({
-  value: process.env.BUILD_ID
-})
-```
-
-If `value` is provided:
-- it is written verbatim
-- it overrides any format
-- whitespace is trimmed safely
-
-This keeps the plugin **stateless and explicit**.
-
----
-
-## CDN & caching behaviour
-
-Because the output is static:
-
-- The file can be cached aggressively
-- It works behind any CDN
-- It works on Cloudflare, Netlify, Vercel, S3, etc.
-
-Example check:
-
-```bash
-curl https://example.com/build-id.txt
+```ts
+import {
+  getFatsomaCacheInfo,
+  refreshFatsomaCache,
+} from "astro-fatsoma/fatsoma";
 ```
 
 ---
 
-## Failure behaviour
+## Encoding & HTML
 
-If the file cannot be written:
-
-- A warning is logged
-- The build continues
-- The site is not broken
-
-This plugin must never break a deployment.
+- Text is returned exactly as provided by Fatsoma
+- `descriptionHtml` contains raw HTML
+- Rendering & sanitisation are the responsibility of the consumer
 
 ---
 
-## Roadmap
+## Error handling philosophy
 
-Planned for v2 (not in v1):
-
-- Optional JSON output
-- Multiple IDs (build + deploy)
-- Integration with `astro-build-info`
-
-v1 intentionally stays minimal.
+- Network failures never throw during SSR
+- API errors fail closed
+- Worst case result: `[]`
 
 ---
 
 ## License
 
-MIT
-
----
-
-## Author
-
-Built and maintained by **Velohost**  
+MIT © Velohost  
 https://velohost.co.uk/
-
-Project homepage:  
-https://velohost.co.uk/plugins/astro-build-id/

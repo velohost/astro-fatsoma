@@ -1,6 +1,7 @@
-/**
- * Public event shape (CLEAN + STABLE — v1)
- */
+/* ======================================================
+   Types
+====================================================== */
+
 export interface FatsomaEvent {
   id: string;
 
@@ -25,7 +26,6 @@ export interface FatsomaEvent {
   ageRestriction: string | null;
   attendeesCount: number | null;
 
-  /** Public, frontend-safe location */
   location: {
     name: string;
     city: string | null;
@@ -34,30 +34,33 @@ export interface FatsomaEvent {
 }
 
 /* ======================================================
-   Config access
+   Runtime config (injected at build time)
 ====================================================== */
 
+// This is replaced by Vite at build time
+declare const __ASTRO_FATSOMA_CONFIG__:
+  | {
+      pageId: string;
+    }
+  | undefined;
+
 function getConfig() {
-  const config = (globalThis as any).__ASTRO_FATSOMA_CONFIG__;
-  if (!config) {
+  if (!__ASTRO_FATSOMA_CONFIG__) {
     throw new Error(
-      "[astro-fatsoma] Plugin not initialised. Did you forget to add it to astro.config.mjs?"
+      "[astro-fatsoma] Runtime config missing. Ensure the plugin is registered in astro.config.mjs."
     );
   }
-  return config;
+  return __ASTRO_FATSOMA_CONFIG__;
 }
 
 /* ======================================================
-   In-memory SSR cache (stale-while-revalidate)
+   In-memory SSR cache
 ====================================================== */
 
 let cachedEvents: FatsomaEvent[] | null = null;
 let cacheTimestamp = 0;
 
-// 10 minutes
-const CACHE_TTL = 10 * 60 * 1000;
-
-// Fetch timeout (5s)
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes
 const FETCH_TIMEOUT_MS = 5_000;
 
 function isCacheValid(): boolean {
@@ -67,9 +70,6 @@ function isCacheValid(): boolean {
   );
 }
 
-/**
- * Cache status helper (public, read-only)
- */
 export function getFatsomaCacheInfo() {
   return {
     hasCache: cachedEvents !== null,
@@ -81,16 +81,13 @@ export function getFatsomaCacheInfo() {
   };
 }
 
-/**
- * Manually clear the cache (public API)
- */
 export function refreshFatsomaCache(): void {
   cachedEvents = null;
   cacheTimestamp = 0;
 }
 
 /* ======================================================
-   Fetch live events from Fatsoma (cached + resilient)
+   Fetch events (SSR-safe)
 ====================================================== */
 
 export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
@@ -112,10 +109,7 @@ export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
     `&sort=starts-at-time,relevance`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(
-    () => controller.abort(),
-    FETCH_TIMEOUT_MS
-  );
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
   try {
     const res = await fetch(url, {
@@ -129,17 +123,9 @@ export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
 
     const json = await res.json();
 
-    /* ----------------------------------------------
-       Internal lookup: locationId → public fields
-    ---------------------------------------------- */
-
     const locationsById = new Map<
       string,
-      {
-        name: string;
-        city: string | null;
-        displayName: string;
-      }
+      { name: string; city: string | null; displayName: string }
     >();
 
     for (const item of json.included ?? []) {
@@ -165,16 +151,13 @@ export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
 
       return {
         id: event.id,
-
         name: attrs.name ?? "",
         vanity,
         seoName: attrs["seo-name"] ?? null,
         url: vanity ? `https://www.fatsoma.com/e/${vanity}` : "",
-
         startsAt: attrs["starts-at"] ?? "",
         endsAt: attrs["ends-at"] ?? "",
         lastEntryTime: attrs["last-entry-time"] ?? null,
-
         currency: attrs.currency ?? "",
         price: {
           min:
@@ -186,16 +169,13 @@ export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
               ? attrs["price-max"]
               : null,
         },
-
         image: attrs["asset-url"] ?? null,
         descriptionHtml: attrs.description ?? null,
-
         ageRestriction: attrs["age-restrictions"] ?? null,
         attendeesCount:
           typeof attrs["attendees-count"] === "number"
             ? attrs["attendees-count"]
             : null,
-
         location:
           locationId && locationsById.has(locationId)
             ? locationsById.get(locationId)!
@@ -205,13 +185,9 @@ export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
 
     cachedEvents = events;
     cacheTimestamp = Date.now();
-
     return events;
   } catch {
-    if (cachedEvents) {
-      return cachedEvents;
-    }
-    return [];
+    return cachedEvents ?? [];
   } finally {
     clearTimeout(timeout);
   }

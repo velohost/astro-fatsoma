@@ -24,6 +24,13 @@ export interface FatsomaEvent {
 
   ageRestriction: string | null;
   attendeesCount: number | null;
+
+  /** Public, frontend-safe location */
+  location: {
+    name: string;
+    city: string | null;
+    displayName: string;
+  } | null;
 }
 
 /* ======================================================
@@ -87,7 +94,6 @@ export function refreshFatsomaCache(): void {
 ====================================================== */
 
 export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
-  // Serve valid cache immediately
   if (isCacheValid()) {
     return cachedEvents!;
   }
@@ -100,6 +106,7 @@ export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
     `?filter[status]=active` +
     `&filter[page.id]=${encodeURIComponent(pageId)}` +
     `&filter[ends-at][gte]=${encodeURIComponent(fromDate)}` +
+    `&include=location` +
     `&page[number]=1` +
     `&page[size]=50` +
     `&sort=starts-at-time,relevance`;
@@ -122,9 +129,39 @@ export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
 
     const json = await res.json();
 
+    /* ----------------------------------------------
+       Internal lookup: locationId → public fields
+    ---------------------------------------------- */
+
+    const locationsById = new Map<
+      string,
+      {
+        name: string;
+        city: string | null;
+        displayName: string;
+      }
+    >();
+
+    for (const item of json.included ?? []) {
+      if (item?.type === "locations" && item.id) {
+        const attrs = item.attributes ?? {};
+        const name = attrs.name ?? "";
+        const city = attrs.city ?? null;
+
+        locationsById.set(item.id, {
+          name,
+          city,
+          displayName: city ? `${name}, ${city}` : name,
+        });
+      }
+    }
+
     const events: FatsomaEvent[] = (json.data ?? []).map((event: any) => {
       const attrs = event.attributes ?? {};
       const vanity = attrs["vanity-name"] ?? "";
+
+      const locationId =
+        event.relationships?.location?.data?.id ?? null;
 
       return {
         id: event.id,
@@ -158,6 +195,11 @@ export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
           typeof attrs["attendees-count"] === "number"
             ? attrs["attendees-count"]
             : null,
+
+        location:
+          locationId && locationsById.has(locationId)
+            ? locationsById.get(locationId)!
+            : null,
       };
     });
 
@@ -166,12 +208,9 @@ export async function getFatsomaEvents(): Promise<FatsomaEvent[]> {
 
     return events;
   } catch {
-    // Serve stale cache if available
     if (cachedEvents) {
       return cachedEvents;
     }
-
-    // Absolute SSR-safe fallback
     return [];
   } finally {
     clearTimeout(timeout);

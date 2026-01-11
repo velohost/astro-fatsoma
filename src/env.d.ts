@@ -37,6 +37,13 @@ declare module "astro-fatsoma/fatsoma" {
 
     ageRestriction: string | null;
     attendeesCount: number | null;
+
+    location: {
+      id: string;
+      name: string;
+      city: string | null;
+      displayName: string;
+    } | null;
   }
 
   /**

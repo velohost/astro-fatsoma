@@ -16,6 +16,7 @@ https://velohost.co.uk/plugins/astro-plugins/astro-fatsoma/
 - ✅ In-memory cache with stale-while-revalidate
 - ✅ Zero client-side JavaScript
 - ✅ No analytics, tracking, or cookies
+- ✅ **Location support (venue + city)**
 - ✅ Designed for Astro sites and static generation
 
 ---
@@ -23,6 +24,7 @@ https://velohost.co.uk/plugins/astro-plugins/astro-fatsoma/
 ## What this plugin does
 
 - Fetches **public events** from the Fatsoma API
+- Includes and resolves **event locations**
 - Normalises the response into a **clean v1 interface**
 - Caches results in memory (10 minutes by default)
 - Fails safely — never breaks SSR
@@ -79,6 +81,9 @@ const events = await getFatsomaEvents();
   {events.map(event => (
     <li>
       <a href={event.url}>{event.name}</a>
+      {event.location && (
+        <div>{event.location.displayName}</div>
+      )}
     </li>
   ))}
 </ul>
@@ -112,6 +117,12 @@ export interface FatsomaEvent {
 
   ageRestriction: string | null;
   attendeesCount: number | null;
+
+  location: {
+    name: string;
+    city: string | null;
+    displayName: string;
+  } | null;
 }
 ```
 

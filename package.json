@@ -1,8 +1,8 @@
 {
   "name": "astro-fatsoma",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "An Astro integration that fetches live event data from the Fatsoma API and keeps event listings automatically up to date.",
-  "homepage": "https://velohost.co.uk/plugins/astro-fatsoma/",
+  "homepage": "https://velohost.co.uk/plugins/astro-plugins/astro-fatsoma/",
   "repository": {
     "type": "git",
     "url": "https://github.com/velohost/astro-fatsoma.git"

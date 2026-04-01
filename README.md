@@ -47,6 +47,8 @@ https://velohost.co.uk/plugins/astro-plugins/astro-fatsoma/
 npm install astro-fatsoma
 ```
 
+Compatible with Astro `5.x` and `6.x`.
+
 ---
 
 ## Astro configuration
